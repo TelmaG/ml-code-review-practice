@@ -69,8 +69,10 @@ def gather_context(context_dir: str) -> str:
 
 def call_model(system: str, user: str) -> str:
     """Call Claude through Anthropic's native Messages API."""
-    base_url = os.environ.get("ANTHROPIC_BASE_URL", "https://api.anthropic.com")
-    model = os.environ.get("ANTHROPIC_MODEL", "claude-3-5-haiku-latest")
+    # os.environ.get(key, default) only falls back when the key is absent, not
+    # when a CI variable is set-but-empty — guard both cases explicitly.
+    base_url = os.environ.get("ANTHROPIC_BASE_URL") or "https://api.anthropic.com"
+    model = os.environ.get("ANTHROPIC_MODEL") or "claude-3-5-haiku-latest"
     payload = json.dumps({
         "model": model,
         "max_tokens": 4000,
@@ -147,9 +149,18 @@ def main() -> int:
             "_Coaching format: risk first, suggestion second. "
             "Merge stays blocked until the grade meets the bar._\n\n"
         )
-        raw = call_model(SYSTEM_PROMPT, user_msg)
-        review, grade_data = split_grade(raw)
+        try:
+            raw = call_model(SYSTEM_PROMPT, user_msg)
+            review, grade_data = split_grade(raw)
+        except Exception as exc:
+            # A judge/API failure must not crash the pipeline uninterpretably —
+            # fail the grade cleanly (0 score) so merge stays blocked with a
+            # clear, actionable reason instead of an unhandled workflow error.
+            review = f"Grading agent error: {exc}"
+            grade_data = {"p1_score": 0.0, "p2_score": 0.0, "overall_score": 0.0,
+                          "headline": f"agent error: {exc}"}
         review = header + review
+
 
     with open(args.out, "w") as f:
         f.write(review)
