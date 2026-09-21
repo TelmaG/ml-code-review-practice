@@ -21,6 +21,7 @@ import os
 import re
 import subprocess
 import sys
+import urllib.error
 import urllib.request
 
 SYSTEM_PROMPT = """You are an experienced production ML code reviewer coaching a trainee.
@@ -90,8 +91,12 @@ def call_model(system: str, user: str) -> str:
         },
         method="POST",
     )
-    with urllib.request.urlopen(req, timeout=120) as resp:
-        body = json.loads(resp.read())
+    try:
+        with urllib.request.urlopen(req, timeout=120) as resp:
+            body = json.loads(resp.read())
+    except urllib.error.HTTPError as exc:
+        detail = exc.read().decode(errors="replace")[:500]
+        raise RuntimeError(f"Anthropic API HTTP {exc.code}: {detail}") from None
     return "".join(
         block["text"] for block in body["content"] if block.get("type") == "text"
     )
@@ -128,6 +133,8 @@ def main() -> int:
 
     diff = gather_diff(args.base, args.head)
     context = gather_context(args.context_dir)
+    case_names = sorted(f[:-3] for f in os.listdir(args.context_dir) if f.endswith(".md"))
+    case_slug = case_names[0] if len(case_names) == 1 else ",".join(case_names) or "unknown"
 
     review_notes = ""
     if args.review_notes and os.path.exists(args.review_notes):
@@ -136,7 +143,7 @@ def main() -> int:
 
     if not diff.strip() and not review_notes.strip():
         review = "No changes under `cases/` and no review text found — nothing to evaluate."
-        grade_data = {"p1_score": 0.0, "p2_score": 0.0, "overall_score": 0.0,
+        grade_data = {"case": case_slug, "p1_score": 0.0, "p2_score": 0.0, "overall_score": 0.0,
                       "headline": "empty submission"}
     else:
         user_msg = (
@@ -157,10 +164,9 @@ def main() -> int:
             # fail the grade cleanly (0 score) so merge stays blocked with a
             # clear, actionable reason instead of an unhandled workflow error.
             review = f"Grading agent error: {exc}"
-            grade_data = {"p1_score": 0.0, "p2_score": 0.0, "overall_score": 0.0,
-                          "headline": f"agent error: {exc}"}
+            grade_data = {"case": case_slug, "p1_score": 0.0, "p2_score": 0.0,
+                          "overall_score": 0.0, "headline": f"agent error: {exc}"}
         review = header + review
-
 
     with open(args.out, "w") as f:
         f.write(review)
