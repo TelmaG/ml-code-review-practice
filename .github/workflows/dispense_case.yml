@@ -1,0 +1,109 @@
+name: dispense practice case
+
+# Manually triggered: opens a PR that "assigns" you a case for review.
+# The PR contains the case ticket + bad code; you respond by committing fixes
+# and filling the review template; the grading workflow scores you.
+
+on:
+  workflow_dispatch:
+    inputs:
+      case:
+        description: "Case folder name (leave blank for random)"
+        required: false
+        type: choice
+        options:
+          - case-01-model-loading
+          - case-02-data-pipeline
+          - case-03-llm-batch-job
+          - case-04-training-script
+          - case-05-feature-serving
+          - case-06-project-hygiene
+          - case-07-sklearn-preprocessing
+          - case-08-pandas-indexing
+          - case-09-numpy-broadcasting
+          - case-10-seaborn-monitoring
+          - case-11-batch-inference-queue
+          - case-12-feature-freshness
+          - case-13-data-contract-drift
+          - case-14-distributed-training
+          - case-15-workflow-idempotency
+          - case-16-canary-deployment
+          - case-17-streaming-inference
+          - case-18-pii-observability
+          - case-19-hyperparameter-search
+          - case-20-gpu-serving
+          - case-21-point-in-time-features
+          - case-22-llm-gateway
+          - case-23-retraining-orchestrator
+          - case-24-statistical-rollback
+          - case-25-distributed-join
+          - case-26-model-supply-chain
+          - case-27-event-time-streaming
+          - case-28-fairness-calibration
+          - case-29-ensemble-hedging
+          - case-30-artifact-hot-reload
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  open-pr:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create practice branch
+        run: |
+          CASE="${{ github.event.inputs.case }}"
+          STAMP=$(date +%Y%m%d-%H%M)
+          BRANCH="practice/$CASE-$STAMP"
+          git config user.email github-actions@github.com
+          git config user.name github-actions
+          git checkout -b "$BRANCH"
+          # touch-freeze marker so the PR has a commit ahead of main
+          echo "practice attempt: $STAMP" >> cases/$CASE/ATTEMPTS.md
+          git add cases/$CASE/ATTEMPTS.md
+          git commit -m "practice: start attempt on $CASE ($STAMP)"
+          git push origin "$BRANCH"
+          echo "branch=$BRANCH" >> "$GITHUB_ENV"
+          echo "case=$CASE" >> "$GITHUB_ENV"
+
+      - name: Open the practice PR
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh pr create \
+            --title "Practice review: ${{ env.case }}" \
+            --body-file <(cat <<'MD'
+## 🎯 Practice review assignment
+
+**Case:** `${{ env.case }}`
+
+### How to complete this practice round
+
+1. **Read the ticket:** `cases/${{ env.case }}/ticket.md` — absorb the production
+   context (QPS, data size, SLA) before reviewing.
+2. **Review the code** in `cases/${{ env.case }}/src/` as if it were a real PR.
+   Leave **review comments** on the diff for each issue — use coaching format:
+   > If we deploy this as-is, we risk X under Y. I suggest Z.
+3. **Raise issues as comments.** At minimum, one P1 must be identified in a
+   review comment or in the PR body checklist below.
+4. **(Optional but encouraged) commit your fix** to `cases/${{ env.case }}/src/`
+   on this branch — the grader evaluates both the review and the fix.
+5. Push → the **practice-review-grade** status check evaluates and may block
+   merge until your score meets the bar.
+
+### Self-review checklist (filled by you, graded by the bot)
+
+<!-- Check what you found; the bot compares against the answer key -->
+- [ ] Model loading / startup lifecycle issues
+- [ ] Data/OOM (pandas ops, memory) issues
+- [ ] External call reliability (timeout/retry/backoff)
+- [ ] Reproducibility (seeds, determinism)
+- [ ] Silent failure / data-leakage
+- [ ] Latency in serving hot path
+- [ ] Project/dependency hygiene
+MD
+            ) \
+            --base main

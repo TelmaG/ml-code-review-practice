@@ -1,0 +1,56 @@
+name: case-set self-check
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  cases-still-smelly:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install detector
+        run: pip install -r requirements.txt
+
+      - name: Every case must have required training files
+        run: |
+          failed=0
+          for case in cases/case-*/; do
+            for file in ticket.md expected_issues.md reference_fix/sample_review.md; do
+              if [ ! -f "$case/$file" ]; then
+                echo "::error::$(basename "$case") missing $file"
+                failed=1
+              fi
+            done
+            if ! find "$case/src" -type f | grep -q .; then
+              echo "::error::$(basename "$case") has no source files"
+              failed=1
+            fi
+          done
+          exit $failed
+
+      - name: Every case src must trigger ≥1 finding
+        run: |
+          failed=0
+          for case in cases/case-*/; do
+            name=$(basename "$case")
+            ml_smell_detector analyze "$case/src" --output-dir "reports/$name/" || true
+            count=$(awk '/Total smells detected/{s+=$NF} END{print s+0}' "reports/$name/analysis_report.txt")
+            echo "$name: $count findings"
+            if [ "$count" -eq 0 ]; then
+              echo "::error::case $name produced zero findings — it may have been fixed by accident"
+              failed=1
+            fi
+          done
+          exit $failed
+
+      - name: Dogfood the scorer on bundled sample reviews
+        run: |
+          for case in cases/case-*/; do
+            sample="$case/reference_fix/sample_review.md"
+            [ -f "$sample" ] && python tools/score_review.py --case "$case" --notes "$sample" || true
+          done

@@ -1,0 +1,5 @@
+# PLACEHOLDER for a committed data file.
+# In the real repo this is sales_2023.csv — a 260MB raw sales export.
+# Review as if the real file were committed here.
+date,store_id,day_of_week,promo,temperature,sales
+2023-01-01,1,0,0,4.2,102

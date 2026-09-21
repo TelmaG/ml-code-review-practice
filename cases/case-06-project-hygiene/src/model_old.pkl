@@ -1,0 +1,2 @@
+PLACEHOLDER: binary pickle artifact 'model_old.pkl' committed at repo root.
+No provenance, no metrics, no feature list. (Real repo: an actual 40MB pickle.)

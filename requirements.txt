@@ -1,0 +1,2 @@
+# AST-based ML smell detector (runs with no ML deps installed)
+ml-code-smell-detector>=0.1.2

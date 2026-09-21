@@ -1,0 +1,3 @@
+# PLACEHOLDER: sales_2024_partial.csv — 180MB export committed to the repo.
+date,store_id,day_of_week,promo,temperature,sales
+2024-01-01,1,1,1,1.0,88

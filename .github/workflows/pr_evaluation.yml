@@ -1,0 +1,204 @@
+name: practice PR grading
+
+# The trainee's PR contains their fix + review notes/comments for one case.
+# We grade against the answer key and set a REQUIRED status check — merge is
+# blocked while the score is below par.
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, edited]
+    paths:
+      - "cases/**"
+      - "notes/**"
+
+permissions:
+  pull-requests: write
+  checks: write
+  statuses: write
+  contents: read
+
+env:
+  P1_REQUIRED: "0.85"   # fraction of P1 issues that must be caught
+  P2_REQUIRED: "0.60"
+  OVERALL_REQUIRED: "0.70"
+  ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+  ANTHROPIC_MODEL: ${{ vars.ANTHROPIC_MODEL }}
+  ANTHROPIC_BASE_URL: ${{ vars.ANTHROPIC_BASE_URL }}
+
+jobs:
+  grade:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install grading deps
+        run: pip install -r requirements.txt
+
+      - name: Identify case(s) touched by this PR
+        id: cases
+        run: |
+          CHANGED=$(git diff --name-only origin/${{ github.base_ref }}...HEAD)
+          CASES=$(echo "$CHANGED" | grep -oE 'cases/case-[0-9]+-[a-z0-9-]+' | sort -u | tr '\n' ' ')
+          echo "cases=$CASES" >> "$GITHUB_OUTPUT"
+          if [ -z "$CASES" ]; then echo "no-op=true" >> "$GITHUB_OUTPUT"; fi
+          echo "touched: $CASES"
+
+      - name: Run detector on the PR version of each case (what is still broken?)
+        if: steps.cases.outputs.no-op != 'true'
+        run: |
+          for case in ${{ steps.cases.outputs.cases }}; do
+            name=$(basename "$case")
+            ml_smell_detector analyze "$case/src" --output-dir "reports/$name/" || true
+          done
+
+      - name: Gather PR body + review comments (the trainee's written review)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh pr view ${{ github.event.pull_request.number }} --json body,reviews,comments > pr_meta.json
+          gh api --paginate \
+            repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/comments \
+            > pr_review_comments.json
+          python - <<'PYEOF'
+          import json
+          m = json.load(open("pr_meta.json"))
+          parts = [m.get("body") or ""]
+          parts += [(r.get("body") or "") for r in m.get("reviews", [])]
+          parts += [(c.get("body") or "") for c in m.get("comments", [])]
+          parts += [(c.get("body") or "") for c in json.load(open("pr_review_comments.json"))]
+          open("/tmp/review_notes.md", "w").write("\n\n".join(p for p in parts if p.strip()))
+          PYEOF
+
+      - name: Rule-based grade (keyword scorer over review text)
+        if: steps.cases.outputs.no-op != 'true'
+        run: |
+          for case in ${{ steps.cases.outputs.cases }}; do
+            name=$(basename "$case")
+            python tools/score_review.py --case "$case" --notes /tmp/review_notes.md \
+              --json > "/tmp/$name.rule.json" || true
+            cat "/tmp/$name.rule.json"
+          done
+
+      - name: LLM judge — holistic grade of fix + review quality
+        if: steps.cases.outputs.no-op != 'true'
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          ANTHROPIC_MODEL: ${{ vars.ANTHROPIC_MODEL }}
+          ANTHROPIC_BASE_URL: ${{ vars.ANTHROPIC_BASE_URL }}
+        run: |
+          mkdir -p eval_context
+          for case in ${{ steps.cases.outputs.cases }}; do
+            name=$(basename "$case")
+            {
+              echo "# Case: $name"
+              echo; echo "## Ticket:"; cat "$case/ticket.md"
+              echo; echo "## Rubric hints:"
+              sed -n 's/^[0-9]*\.\s*\*\*\(.*\)\*\*.*/- \1/p' "$case/expected_issues.md"
+              echo; echo "## Detector output on the PR's fixed code:"
+              cat "reports/$name/analysis_report.txt" 2>/dev/null || echo "(none)"
+              echo; echo "## Rule-based keyword score:"
+              cat "/tmp/$name.rule.json" 2>/dev/null || echo "(na)"
+            } > "eval_context/$name.md"
+          done
+          python tools/agent_review.py \
+            --base origin/${{ github.base_ref }} --head HEAD \
+            --context-dir eval_context \
+            --review-notes /tmp/review_notes.md \
+            --out review_comment.md \
+            --json-out grade.json
+          cat grade.json
+
+      - name: Post grade comment on the PR
+        if: steps.cases.outputs.no-op != 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            await github.rest.issues.createComment({
+              owner: context.repo.owner, repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: fs.readFileSync('review_comment.md', 'utf8'),
+            });
+
+      - name: Set grade status check (blocks merge below par)
+        if: steps.cases.outputs.no-op != 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const grade = JSON.parse(require('fs').readFileSync('grade.json', 'utf8'));
+            const th = {
+              p1: parseFloat(process.env.P1_REQUIRED),
+              overall: parseFloat(process.env.OVERALL_REQUIRED),
+            };
+            const pass = grade.p1_score >= th.p1 && grade.overall_score >= th.overall;
+            const fmt = f => (f * 100).toFixed(0) + '%';
+            const summary = `P1 ${fmt(grade.p1_score)} (bar ${fmt(th.p1)}) · ` +
+                            `P2 ${fmt(grade.p2_score)} · overall ${fmt(grade.overall_score)} (bar ${fmt(th.overall)})`;
+            await github.rest.repos.createCommitStatus({
+              owner: context.repo.owner, repo: context.repo.repo,
+              sha: context.payload.pull_request.head.sha,
+              context: 'practice-review-grade',
+              state: pass ? 'success' : 'failure',
+              description: (pass ? 'meets bar — ' : 'below bar — ') + summary,
+            });
+            if (!pass) {
+              core.setFailed(`Practice grade below the bar. ${summary}. ` +
+                             `Improve the fix/review and push again — merging is blocked.`);
+            }
+
+      - name: Open a performance-tracking issue when the grade fails
+        if: failure() && steps.cases.outputs.no-op != 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const grade = JSON.parse(fs.readFileSync('grade.json', 'utf8'));
+
+            // Per-case missed-issue hints from the rule-based score (hints, never fixes).
+            const { execSync } = require('child_process');
+            const gaps = [];
+            for (const caseDir of '${{ steps.cases.outputs.cases }}'.trim().split(/\s+/)) {
+              const caseName = caseDir.split('/').pop();
+              try {
+                const rule = JSON.parse(fs.readFileSync(`/tmp/${caseName}.rule.json`, 'utf8'));
+                for (const issueId of rule.missed || []) {
+                  gaps.push(`- \`${issueId.replace(/-/g, ' ')}\` — re-scan \`${caseDir}/src/\` with this category in mind (hint, not solution)`);
+                }
+              } catch { /* file may not exist */ }
+            }
+
+            const level = execSync(`python tools/levels.py --level-of ${grade.case}`).toString().trim();
+            const issueBody = [
+              `## Practice performance gap — \`${grade.case}\``,
+              '',
+              `| | |`,
+              `|---|---|`,
+              `| Level | **${level}** |`,
+              `| PR | #${context.issue.number} |`,
+              `| P1 score | ${(grade.p1_score * 100).toFixed(0)}% (bar ${parseFloat(process.env.P1_REQUIRED) * 100}%) |`,
+              `| Overall | ${(grade.overall_score * 100).toFixed(0)}% (bar ${parseFloat(process.env.OVERALL_REQUIRED) * 100}%) |`,
+              `| Headline | ${grade.headline || ''} |`,
+              '',
+              `### Gaps to recheck (hints only — solutions deliberately omitted)`,
+              '',
+              gaps.length ? gaps.join('\n') : '_The keyword scorer caught no specific misses; the LLM judge disagreed with the fix semantics — re-read the grade comment and re-derive the risk sentence per P1._',
+              '',
+              `### How to close this issue`,
+              `1. Push an improved fix/review to the PR branch (re-grading is automatic).`,
+              `2. When \`practice-review-grade\` passes, close this issue with one line: what you learned.`,
+              `3. After 3 clean passes at this level, move up a difficulty in \`cases/levels.yaml\` progression.`,
+              '',
+              `_Anti-spoiler: this issue never quotes the answer key. If you're stuck after two attempts, ask an AI to generate a similar synthetic case on the same topic in \`skills/generate-case\` style, rather than reading the key._`,
+            ].join('\n');
+
+            await github.rest.issues.create({
+              owner: context.repo.owner, repo: context.repo.repo,
+              title: `practice gap: ${grade.case} (${level}) — P1 ${(grade.p1_score * 100).toFixed(0)}%`,
+              body: issueBody,
+              labels: ['practice-tracking', level],
+            });

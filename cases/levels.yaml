@@ -1,0 +1,38 @@
+# Case difficulty registry — single source of truth
+# consumed by dispense_case.yml, the grading workflow, and tools.
+
+easy:
+  - case-01-model-loading
+  - case-02-data-pipeline
+  - case-03-llm-batch-job
+  - case-04-training-script
+  - case-05-feature-serving
+  - case-06-project-hygiene
+  - case-07-sklearn-preprocessing
+  - case-08-pandas-indexing
+  - case-09-numpy-broadcasting
+  - case-10-seaborn-monitoring
+
+medium:
+  - case-11-batch-inference-queue
+  - case-12-feature-freshness
+  - case-13-data-contract-drift
+  - case-14-distributed-training
+  - case-15-workflow-idempotency
+  - case-16-canary-deployment
+  - case-17-streaming-inference
+  - case-18-pii-observability
+  - case-19-hyperparameter-search
+  - case-20-gpu-serving
+
+difficult:
+  - case-21-point-in-time-features
+  - case-22-llm-gateway
+  - case-23-retraining-orchestrator
+  - case-24-statistical-rollback
+  - case-25-distributed-join
+  - case-26-model-supply-chain
+  - case-27-event-time-streaming
+  - case-28-fairness-calibration
+  - case-29-ensemble-hedging
+  - case-30-artifact-hot-reload
