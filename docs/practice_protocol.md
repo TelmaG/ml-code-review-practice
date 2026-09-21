@@ -64,8 +64,8 @@ Append one line to `notes/progress.md`: case, P1 recall, P2 recall, one lesson.
 ## Spaced repetition
 
 Re-run each case blind after 3 days, 1 week, 3 weeks. You "own" a case when you
-catch 100% of P1s and ≥80% of P2s twice in a row. Then generate new cases with the
-LLM workflow in `skills/generate-case/SKILL.md`.
+catch 100% of P1s and ≥80% of P2s twice in a row. Then move up a difficulty
+level or ask an LLM to generate a new synthetic case on the same anti-pattern.
 
 ## Mock-interview mode
 

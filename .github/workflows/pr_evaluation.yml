@@ -166,17 +166,22 @@ jobs:
                         headline: 'grading pipeline error before a grade could be produced' };
             }
 
-            // Per-case missed-issue hints from the rule-based score (hints, never fixes).
+            // Prefer the LLM judge's own missed_hints (it reasons about the fix
+            // semantics); fall back to the rule-based keyword scorer's misses.
             const { execSync } = require('child_process');
-            const gaps = [];
-            for (const caseDir of '${{ steps.cases.outputs.cases }}'.trim().split(/\s+/)) {
-              const caseName = caseDir.split('/').pop();
-              try {
-                const rule = JSON.parse(fs.readFileSync(`/tmp/${caseName}.rule.json`, 'utf8'));
-                for (const issueId of rule.missed || []) {
-                  gaps.push(`- \`${issueId.replace(/-/g, ' ')}\` — re-scan \`${caseDir}/src/\` with this category in mind (hint, not solution)`);
-                }
-              } catch { /* file may not exist */ }
+            let gaps = (grade.missed_hints || []).map(
+              h => `- ${h} (hint, not solution)`
+            );
+            if (gaps.length === 0) {
+              for (const caseDir of '${{ steps.cases.outputs.cases }}'.trim().split(/\s+/)) {
+                const caseName = caseDir.split('/').pop();
+                try {
+                  const rule = JSON.parse(fs.readFileSync(`/tmp/${caseName}.rule.json`, 'utf8'));
+                  for (const issueId of rule.missed || []) {
+                    gaps.push(`- \`${issueId.replace(/-/g, ' ')}\` — re-scan \`${caseDir}/src/\` with this category in mind (hint, not solution)`);
+                  }
+                } catch { /* file may not exist */ }
+              }
             }
 
             const level = execSync(`python tools/levels.py --level-of ${grade.case}`).toString().trim();
@@ -193,14 +198,14 @@ jobs:
               '',
               `### Gaps to recheck (hints only — solutions deliberately omitted)`,
               '',
-              gaps.length ? gaps.join('\n') : '_The keyword scorer caught no specific misses; the LLM judge disagreed with the fix semantics — re-read the grade comment and re-derive the risk sentence per P1._',
+              gaps.length ? gaps.join('\n') : '_No specific misses were reported; re-read the grade comment and re-derive the risk sentence per P1._',
               '',
               `### How to close this issue`,
               `1. Push an improved fix/review to the PR branch (re-grading is automatic).`,
               `2. When \`practice-review-grade\` passes, close this issue with one line: what you learned.`,
               `3. After 3 clean passes at this level, move up a difficulty in \`cases/levels.yaml\` progression.`,
               '',
-              `_Anti-spoiler: this issue never quotes the answer key. If you're stuck after two attempts, ask an AI to generate a similar synthetic case on the same topic in \`skills/generate-case\` style, rather than reading the key._`,
+              `_Anti-spoiler: this issue never quotes the answer key. Solutions are deliberately omitted above._`,
             ].join('\n');
 
             await github.rest.issues.create({
