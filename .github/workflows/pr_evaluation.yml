@@ -157,7 +157,13 @@ jobs:
         with:
           script: |
             const fs = require('fs');
-            const grade = JSON.parse(fs.readFileSync('grade.json', 'utf8'));
+            let grade;
+            try {
+              grade = JSON.parse(fs.readFileSync('grade.json', 'utf8'));
+            } catch {
+              grade = { case: 'unknown', p1_score: 0, p2_score: 0, overall_score: 0,
+                        headline: 'grading pipeline error before a grade could be produced' };
+            }
 
             // Per-case missed-issue hints from the rule-based score (hints, never fixes).
             const { execSync } = require('child_process');
