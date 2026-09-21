@@ -17,7 +17,7 @@ until your score meets the bar**.
    - Repo → Settings → Secrets and variables → Actions → New repository secret:
      `ANTHROPIC_API_KEY` — your Anthropic API key.
    - Optionally add repository variables `ANTHROPIC_MODEL` and
-     `ANTHROPIC_BASE_URL`. The default model is `claude-3-5-haiku-latest` and
+     `ANTHROPIC_BASE_URL`. The default model is `claude-sonnet-4-5-20250929` and
      the default endpoint is `https://api.anthropic.com`.
    - The workflow does not use OpenAI-compatible configuration.
 

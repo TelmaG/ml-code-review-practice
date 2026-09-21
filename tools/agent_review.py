@@ -8,7 +8,7 @@ Required environment variable:
     ANTHROPIC_API_KEY — API key for Claude
 
 Optional environment variables:
-    ANTHROPIC_MODEL — default: claude-3-5-haiku-20241022
+    ANTHROPIC_MODEL — default: claude-sonnet-4-5-20250929
     ANTHROPIC_BASE_URL — default: https://api.anthropic.com
 
 Usage:
@@ -73,7 +73,7 @@ def call_model(system: str, user: str) -> str:
     # os.environ.get(key, default) only falls back when the key is absent, not
     # when a CI variable is set-but-empty — guard both cases explicitly.
     base_url = os.environ.get("ANTHROPIC_BASE_URL") or "https://api.anthropic.com"
-    model = os.environ.get("ANTHROPIC_MODEL") or "claude-3-5-haiku-20241022"
+    model = os.environ.get("ANTHROPIC_MODEL") or "claude-sonnet-4-5-20250929"
     payload = json.dumps({
         "model": model,
         "max_tokens": 4000,
