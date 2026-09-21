@@ -227,15 +227,9 @@ When a score is below the threshold, the workflow opens a GitHub Issue containin
 - Hints describing where to look next
 - No copied solution from `expected_issues.md`
 
-Use labels `practice-tracking`, `easy`, `medium`, and `difficult` to filter your
+Use labels `practice-tracking`, `easy`, `medium`, and `difficult` to filter
 performance history. Improve the PR, push again, pass the status check, then
 close the tracking issue with a short reflection.
-
-## Claude agent
-
-The PR grading agent uses Anthropic's native Claude Messages API. Configure the
-private GitHub repository with the `ANTHROPIC_API_KEY` Actions secret. The
-workflow does not require an OpenAI key or OpenAI-compatible endpoint.
 
 ## GitHub repository
 
