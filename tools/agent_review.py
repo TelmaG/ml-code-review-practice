@@ -48,7 +48,8 @@ You MUST end your reply with these XML tags, computing scores from your own
 assessments (and improving on the keyword score where it's clearly wrong):
 
 <grade>{"case": "<slug>", "p1_score": 0.0-1.0, "p2_score": 0.0-1.0,
-"overall_score": 0.0-1.0, "headline": "<one line>"}</grade>"""
+"overall_score": 0.0-1.0, "headline": "<one line>",
+"missed_hints": ["<short area to recheck, no solution, one per MISSED item>"]}</grade>"""
 
 
 def gather_diff(base: str, head: str) -> str:
@@ -107,7 +108,7 @@ def split_grade(raw: str) -> tuple:
     import re
     m = re.search(r"<grade>(.*?)</grade>", raw, re.DOTALL)
     grade_data = {"case": "unknown", "p1_score": 0.0, "p2_score": 0.0,
-                  "overall_score": 0.0, "headline": "no grade parsed"}
+                  "overall_score": 0.0, "headline": "no grade parsed", "missed_hints": []}
     if m:
         try:
             grade_data.update(json.loads(m.group(1)))
@@ -144,7 +145,7 @@ def main() -> int:
     if not diff.strip() and not review_notes.strip():
         review = "No changes under `cases/` and no review text found — nothing to evaluate."
         grade_data = {"case": case_slug, "p1_score": 0.0, "p2_score": 0.0, "overall_score": 0.0,
-                      "headline": "empty submission"}
+                      "headline": "empty submission", "missed_hints": []}
     else:
         user_msg = (
             "## Case context\n\n" + context +
@@ -165,7 +166,7 @@ def main() -> int:
             # clear, actionable reason instead of an unhandled workflow error.
             review = f"Grading agent error: {exc}"
             grade_data = {"case": case_slug, "p1_score": 0.0, "p2_score": 0.0,
-                          "overall_score": 0.0, "headline": f"agent error: {exc}"}
+                          "overall_score": 0.0, "headline": f"agent error: {exc}", "missed_hints": []}
         review = header + review
 
     with open(args.out, "w") as f:
