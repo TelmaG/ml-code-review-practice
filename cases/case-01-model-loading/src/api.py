@@ -28,7 +28,6 @@ def predict(payload: dict):
         payload["voicemail_enabled"],
     ]
     score = predict_row(row)
-    print(f"predicted churn={score} for payload={payload}")
     return {"churn_probability": score}
 
 
