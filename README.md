@@ -232,11 +232,34 @@ Use labels `practice-tracking`, `easy`, `medium`, and `difficult` to filter
 performance history. Improve the PR, push again, pass the status check, then
 close the tracking issue with a short reflection.
 
-### Study guide from recurring gaps
+## Skills
 
-`tools/gap_analysis.py` reads the `practice-tracking` issues, buckets each
-missed hint into a Python/ML-engineering concept, and ranks the weakest ones by
-frequency. `skills/python-mastery-coach/` turns that into a personalized study
-guide (mental model, why it bites in production, a worked example, and a
-self-check exercise per concept) without exposing any case's answer key.
+`skills/` holds reusable agent skills (in the `SKILL.md` convention popularized
+by [mattpocock/skills](https://github.com/mattpocock/skills)): a short
+frontmatter (`name`, `description`) plus step-by-step instructions an agent
+follows when invoked, kept separate from the one-off case content in `cases/`.
+
+### python-mastery-coach
+
+Purpose: turn *repeated* gaps from failed practice PRs into a personalized
+Python/ML-engineering study guide — one level up from any single case, so it
+still helps once you've moved past the specific case that exposed the gap.
+
+| File | Role |
+|---|---|
+| `skills/python-mastery-coach/SKILL.md` | The skill definition: when to use it, and the step-by-step procedure (aggregate → look up → write guide → log progress). |
+| `skills/python-mastery-coach/concept-map.md` | 16 concepts grounded in `docs/review_rubric.md` and the case breakdown above. Each has a mental model, why it bites in production, a correct worked example, a self-check exercise, and reference docs. |
+| `tools/gap_analysis.py` | Reads `practice-tracking` issues via `gh issue list`, classifies each missed hint into a concept id, and ranks the weakest concepts by frequency with issue numbers as evidence. |
+
+Usage:
+
+```bash
+python tools/gap_analysis.py          # ranked weak concepts + evidence
+python tools/gap_analysis.py --json   # machine-readable, for the skill to consume
+```
+
+Ask an agent to "use the python-mastery-coach skill" (or just "what should I
+study") and it will run the aggregation, cross-reference `concept-map.md`, and
+write `notes/study-guide-<date>.md` — gitignored and personal, never exposing
+any case's `expected_issues.md`.
 
