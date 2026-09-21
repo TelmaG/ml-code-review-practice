@@ -22,6 +22,7 @@ cases/            # 30 practice cases, grouped by difficulty (easy/medium/diffic
     expected_issues.md  # the answer key (do not read before reviewing!)
     reference_fix/      # fixed code + sample review comments in coaching style
 docs/             # practice protocol, review rubric, feedback phrasing templates
+skills/           # python-mastery-coach: turns repeated gaps into a study guide
 tools/            # scripts to run linters on cases and score your review notes
 ```
 
@@ -230,4 +231,12 @@ When a score is below the threshold, the workflow opens a GitHub Issue containin
 Use labels `practice-tracking`, `easy`, `medium`, and `difficult` to filter
 performance history. Improve the PR, push again, pass the status check, then
 close the tracking issue with a short reflection.
+
+### Study guide from recurring gaps
+
+`tools/gap_analysis.py` reads the `practice-tracking` issues, buckets each
+missed hint into a Python/ML-engineering concept, and ranks the weakest ones by
+frequency. `skills/python-mastery-coach/` turns that into a personalized study
+guide (mental model, why it bites in production, a worked example, and a
+self-check exercise per concept) without exposing any case's answer key.
 
