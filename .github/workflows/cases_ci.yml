@@ -3,6 +3,11 @@ name: case-set self-check
 on:
   push:
     branches: [main]
+    paths:
+      - "cases/**"
+      - "tools/**"
+      - "requirements.txt"
+      - ".github/workflows/cases_ci.yml"
 
 jobs:
   cases-still-smelly:

@@ -231,24 +231,3 @@ Use labels `practice-tracking`, `easy`, `medium`, and `difficult` to filter
 performance history. Improve the PR, push again, pass the status check, then
 close the tracking issue with a short reflection.
 
-## GitHub repository
-
-This repository should be pushed to the private fork at:
-
-```bash
-git@github.com:TelmaG/ml-code-review-practice.git
-```
-
-Keep it outside the NOS organization and ensure it remains private.
-
-### Agent secrets
-
-The grading agent uses an LLM API. In the target repo:
-
-1. Go to **Settings → Secrets and variables → Actions**.
-2. Add `ANTHROPIC_API_KEY` — your Anthropic API key.
-3. Optionally add repository variables `ANTHROPIC_MODEL` and
-   `ANTHROPIC_BASE_URL`. The defaults are `claude-3-5-haiku-latest` and
-   `https://api.anthropic.com`.
-
-Do not add an OpenAI key or commit the Claude key anywhere in the repository.
